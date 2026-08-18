@@ -135,6 +135,31 @@ class CoreTestService : Service() {
         }
     }
 
+    private fun handleMeasureStartOLD(message: TestServiceMessage, startId: Int) {
+        LogUtil.i(AppConfig.TAG, "CoreTestService starting worker   subscription ${message.subscriptionId}")
+
+        val guidsList = when {
+            message.serverGuids.isNotEmpty() -> message.serverGuids
+            message.subscriptionId.isNotEmpty() -> MmkvManager.decodeServerList(message.subscriptionId)
+            else -> MmkvManager.decodeAllServerList()
+        }
+
+        if (guidsList.isNotEmpty()) {
+            lateinit var worker: RealPingWorkerService
+            worker = RealPingWorkerService(
+                context = this,
+                guids = guidsList,
+                onlyTcp = message.onlyTcp,
+                onEvent = { event -> handleWorkerEvent(event, message) { activeWorkers.remove(worker) } }
+            )
+            activeWorkers.add(worker)
+            worker.start()
+        } else {
+            NotificationHelper.stopForeground(this)
+            stopSelf(startId)
+        }
+    }
+
     private fun handleWorkerEvent(event: RealPingEvent, message: TestServiceMessage, onWorkerDone: () -> Unit) {
         when (event) {
             is RealPingEvent.Progress -> {
@@ -166,11 +191,13 @@ class CoreTestService : Service() {
                 // -- BEGIN: Network-based group assignment (new feature) --
                 val subId = message.subscriptionId
                 // Collect valid config GUIDs from this test run (delay >= 0 = valid)
-val validGuids = subId?.let { sub ->
-    MmkvManager.decodeServerList(sub).filter { guid ->
-        MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: -1L >= 0L
-    }.takeIf { it.isNotEmpty() }
-} ?: emptyList()
+                val validGuids = subId?.let { subIdTemp ->
+                    val serverList = MmkvManager.decodeServerList(subIdTemp)
+                    serverList.filterIndexed { index, guid ->
+                        val aff = MmkvManager.decodeServerAffiliationInfo(guid)
+                        (aff?.testDelayMillis ?: -1L) >= 0L
+                    }.takeIf { it.isNotEmpty() }
+                } ?: emptyList()
 
                 if (validGuids.isNotEmpty() && subId?.isNotEmpty() == true) {
                     val networkKey = NetworkDetector.getNetworkKey(this)
@@ -180,10 +207,14 @@ val validGuids = subId?.let { sub ->
                         // Find existing subscription with matching remarks (case-insensitive)
                         val subs = MmkvManager.decodeSubscriptions()
                         val existingSubId = subs.asSequence()
-                            .firstOrNull { cache -> cache.subscription.remarks?.trim().lowercase() == networkKey.lowercase() }
+                            .firstOrNull { cache ->
+                                cache.subscription.remarks != null &&
+                                cache.subscription.remarks?.trim().lowercase() == networkKey.lowercase()
+                            }
                             ?.guid
 
-                        val targetSubId = existingSubId ?: run {
+                        @Suppress("UNCHECKED_CAST")
+                        val targetSubId: String = existingSubId ?: run {
                             // Create new subscription with network key as remarks
                             val newSub = SubscriptionItem()
                             newSub.remarks = networkKey
@@ -191,8 +222,10 @@ val validGuids = subId?.let { sub ->
                         }
 
                         // Add valid guids to target subscription's server list (union, no duplicates)
-                        val existingGuids = MmkvManager.decodeServerList(targetSubId)
-                        val merged = existingGuids + validGuids.distinct()
+                        @Suppress("UNCHECKED_CAST")
+                        val existingGuids = MmkvManager.decodeServerList(targetSubId) as MutableList<String>
+                        @Suppress("UNCHECKED_CAST")
+                        val merged = existingGuids + (validGuids.distinct() as MutableList<String>)
                         MmkvManager.encodeServerList(merged, targetSubId)
                     }
                 }

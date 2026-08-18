@@ -2,7 +2,8 @@ package com.v2ray.ang.handler
 
 import android.content.Context
 import android.net.ConnectivityManager
-import android.net.NetworkInfo
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.telephony.TelephonyManager
 
@@ -13,11 +14,14 @@ object NetworkDetector {
         val activeNetwork = cm.activeNetwork
         if (activeNetwork == null) return null
 
-        val networkInfo = cm.getNetworkInfo(activeNetwork)
-        val type = networkInfo?.type
+        val networkCapabilities = cm.getNetworkCapabilities(activeNetwork)
+        if (networkCapabilities == null) return null
 
-        return if (type == NetworkInfo.TYPE_WIFI) wifiKey(context)
-        else if (type == NetworkInfo.TYPE_MOBILE) mobileKey(context)
+        val hasWifi = networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+        val hasCellular = networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+
+        return if (hasWifi) wifiKey(context)
+        else if (hasCellular) mobileKey(context)
         else null
     }
 
