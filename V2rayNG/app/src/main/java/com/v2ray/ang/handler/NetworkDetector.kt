@@ -14,25 +14,24 @@ object NetworkDetector {
         if (activeNetwork == null) return null
 
         val networkInfo = cm.getNetworkInfo(activeNetwork)
-        return when {
-            networkInfo.type == NetworkInfo.TYPE_WIFI → wifiKey(context)
-            networkInfo.type == NetworkInfo.TYPE_MOBILE → mobileKey(context)
-            else → null
-        }
+        val type = networkInfo?.type
+
+        return if (type == NetworkInfo.TYPE_WIFI) wifiKey(context)
+        else if (type == NetworkInfo.TYPE_MOBILE) mobileKey(context)
+        else null
     }
 
     private fun wifiKey(context: Context): String {
         try {
             val wifiManager = context.getSystemService(WifiManager::class.java)
             val ssid = wifiManager.connectionInfo?.ssid
-            return when {
-                ssid == null || ssid.isNullOrBlank() → "Wi-Fi"
-                ssid == "<unknown ssid>" → "Wi-Fi"
-                ssid.startsWith("\"") && ssid.endsWith("\"") →
-                    "Wi-Fi - ${ssid.substring(1, ssid.length-1)}"
-                else → "Wi-Fi"
+            if (ssid == null || ssid.isNullOrBlank()) return "Wi-Fi"
+            if (ssid == "<unknown ssid>") return "Wi-Fi"
+            if (ssid.startsWith("\"") && ssid.endsWith("\"")) {
+                return "Wi-Fi - ${ssid.substring(1, ssid.length-1)}"
             }
-        } catch (e: Exception) → "Wi-Fi"
+            return "Wi-Fi"
+        } catch (e: Exception) return "Wi-Fi"
     }
 
     private fun mobileKey(context: Context): String {

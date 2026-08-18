@@ -17,6 +17,7 @@ import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.AppLocaleManager
 import com.v2ray.ang.handler.NetworkDetector
 import com.v2ray.ang.handler.MmkvManager
+import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.helper.MessageHelper
 import com.v2ray.ang.helper.NotificationHelper
 import com.v2ray.ang.util.LogUtil
@@ -164,11 +165,12 @@ class CoreTestService : Service() {
 
                 // -- BEGIN: Network-based group assignment (new feature) --
                 val subId = message.subscriptionId
-                val validGuids = subId?.let { sub ->
-                    MmkvManager.decodeServerList(sub).filter { guid ->
-                        MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: -1L >= 0L
-                    }.takeIf { it.isNotEmpty() }
-                } ?: emptyList()
+                // Collect valid config GUIDs from this test run (delay >= 0 = valid)
+val validGuids = subId?.let { sub ->
+    MmkvManager.decodeServerList(sub).filter { guid ->
+        MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: -1L >= 0L
+    }.takeIf { it.isNotEmpty() }
+} ?: emptyList()
 
                 if (validGuids.isNotEmpty() && subId?.isNotEmpty() == true) {
                     val networkKey = NetworkDetector.getNetworkKey(this)
@@ -178,7 +180,7 @@ class CoreTestService : Service() {
                         // Find existing subscription with matching remarks (case-insensitive)
                         val subs = MmkvManager.decodeSubscriptions()
                         val existingSubId = subs.asSequence()
-                            .firstOrNull { it.subscription.remarks?.trim().lowercase() == networkKey.lowercase() }
+                            .firstOrNull { cache -> cache.subscription.remarks?.trim().lowercase() == networkKey.lowercase() }
                             ?.guid
 
                         val targetSubId = existingSubId ?: run {
