@@ -15,6 +15,7 @@ import com.v2ray.ang.enums.NotificationChannelType
 import com.v2ray.ang.extension.serializable
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.AppLocaleManager
+import com.v2ray.ang.handler.NetworkDetector
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.helper.MessageHelper
 import com.v2ray.ang.helper.NotificationHelper
@@ -160,6 +161,40 @@ class CoreTestService : Service() {
                         AngConfigManager.sortByTestResultsForSub(message.subscriptionId)
                     }
                 }
+
+                // -- BEGIN: Network-based group assignment (new feature) --
+                val subId = message.subscriptionId
+                val validGuids = subId?.let { sub ->
+                    MmkvManager.decodeServerList(sub).filter { guid ->
+                        MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis ?: -1L >= 0L
+                    }.takeIf { it.isNotEmpty() }
+                } ?: emptyList()
+
+                if (validGuids.isNotEmpty() && subId?.isNotEmpty() == true) {
+                    val networkKey = NetworkDetector.getNetworkKey(this)
+
+                    // Skip if network type cannot be determined (VPN/Ethernet/unknown)
+                    if (networkKey != null) {
+                        // Find existing subscription with matching remarks (case-insensitive)
+                        val subs = MmkvManager.decodeSubscriptions()
+                        val existingSubId = subs.asSequence()
+                            .firstOrNull { it.subscription.remarks?.trim().lowercase() == networkKey.lowercase() }
+                            ?.guid
+
+                        val targetSubId = existingSubId ?: run {
+                            // Create new subscription with network key as remarks
+                            val newSub = SubscriptionItem()
+                            newSub.remarks = networkKey
+                            MmkvManager.encodeSubscription("", newSub)
+                        }
+
+                        // Add valid guids to target subscription's server list (union, no duplicates)
+                        val existingGuids = MmkvManager.decodeServerList(targetSubId)
+                        val merged = existingGuids + validGuids.distinct()
+                        MmkvManager.encodeServerList(merged, targetSubId)
+                    }
+                }
+                // -- END: Network-based group assignment --
 
                 MessageHelper.sendMsg2UI(this, AppConfig.MSG_MEASURE_CONFIG_FINISH, event.status)
                 onWorkerDone()
