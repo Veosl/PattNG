@@ -21,6 +21,7 @@ import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.helper.MessageHelper
 import com.v2ray.ang.helper.NotificationHelper
 import com.v2ray.ang.util.LogUtil
+import com.v2ray.ang.util.Utils
 import java.util.Collections
 
 class CoreTestService : Service() {
@@ -193,7 +194,7 @@ class CoreTestService : Service() {
                 // Collect valid config GUIDs from this test run (delay >= 0 = valid)
                 val validGuids = subId?.let { subIdTemp ->
                     val serverList = MmkvManager.decodeServerList(subIdTemp)
-                    serverList.filterIndexed { index, guid ->
+                    serverList.filter { guid ->
                         val aff = MmkvManager.decodeServerAffiliationInfo(guid)
                         (aff?.testDelayMillis ?: -1L) >= 0L
                     }.takeIf { it.isNotEmpty() }
@@ -208,24 +209,22 @@ class CoreTestService : Service() {
                         val subs = MmkvManager.decodeSubscriptions()
                         val existingSubId = subs.asSequence()
                             .firstOrNull { cache ->
-                                cache.subscription.remarks != null &&
-                                cache.subscription.remarks?.trim().lowercase() == networkKey.lowercase()
+                                cache.subscription.remarks.trim().lowercase() == networkKey.lowercase()
                             }
                             ?.guid
 
-                        @Suppress("UNCHECKED_CAST")
                         val targetSubId: String = existingSubId ?: run {
                             // Create new subscription with network key as remarks
                             val newSub = SubscriptionItem()
                             newSub.remarks = networkKey
-                            MmkvManager.encodeSubscription("", newSub)
+                            val newGuid = Utils.getUuid()
+                            MmkvManager.encodeSubscription(newGuid, newSub)
+                            newGuid
                         }
 
                         // Add valid guids to target subscription's server list (union, no duplicates)
-                        @Suppress("UNCHECKED_CAST")
-                        val existingGuids = MmkvManager.decodeServerList(targetSubId) as MutableList<String>
-                        @Suppress("UNCHECKED_CAST")
-                        val merged = existingGuids + (validGuids.distinct() as MutableList<String>)
+                        val existingGuids = MmkvManager.decodeServerList(targetSubId)
+                        val merged = (existingGuids + validGuids.distinct()).toMutableList()
                         MmkvManager.encodeServerList(merged, targetSubId)
                     }
                 }
