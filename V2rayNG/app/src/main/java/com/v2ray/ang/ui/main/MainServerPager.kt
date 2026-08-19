@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextOverflow
@@ -249,7 +250,6 @@ private fun ServerItemRow(
         statistics = profile.description.nullIfBlank()
             ?: AngConfigManager.generateDescription(profile),
         typeDescription = getProtocolDescription(profile),
-        testResult = serverCache.testDelayString,
         testDelayMillis = serverCache.testDelayMillis,
         isSelected = serverCache.guid == selectedGuid,
         subscriptionRemarks = subRemarks,
@@ -283,7 +283,6 @@ private fun ServerItemColumn(
             remarks = profile.remarks,
             statistics = profile.description.nullIfBlank() ?: AngConfigManager.generateDescription(profile),
             typeDescription = getProtocolDescription(profile),
-            testResult = serverCache.testDelayString,
             testDelayMillis = serverCache.testDelayMillis,
             isSelected = serverCache.guid == selectedGuid,
             subscriptionRemarks = subRemarks,
@@ -303,7 +302,6 @@ fun ServerListItem(
     remarks: String,
     statistics: String,
     typeDescription: String,
-    testResult: String,
     testDelayMillis: Long,
     isSelected: Boolean,
     subscriptionRemarks: String,
@@ -316,6 +314,12 @@ fun ServerListItem(
     modifier: Modifier = Modifier,
     dragModifier: Modifier = Modifier
 ) {
+    val testResult = if (testDelayMillis == 0L) {
+        ""
+    } else {
+        stringResource(R.string.server_test_delay_value, testDelayMillis)
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -351,12 +355,34 @@ fun ServerListItem(
                 Text(remarks, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge.copy(lineBreak = LineBreak.Paragraph), maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (doubleColumnDisplay) {
                     IconButton(onClick = onMore, Modifier.size(36.dp)) {
-                        Icon(painterResource(R.drawable.ic_more_vert_24dp), null, Modifier.size(24.dp))
+                        Icon(
+                            painterResource(R.drawable.ic_more_vert_24dp),
+                            stringResource(R.string.acc_more),
+                            Modifier.size(24.dp)
+                        )
                     }
                 } else {
-                    IconButton(onClick = onShare, Modifier.size(36.dp)) { Icon(painterResource(R.drawable.ic_share_24dp), null, Modifier.size(24.dp)) }
-                    IconButton(onClick = onEdit, Modifier.size(36.dp)) { Icon(painterResource(R.drawable.ic_edit_24dp), null, Modifier.size(24.dp)) }
-                    IconButton(onClick = onRemove, Modifier.size(36.dp)) { Icon(painterResource(R.drawable.ic_delete_24dp), null, Modifier.size(24.dp)) }
+                    IconButton(onClick = onShare, Modifier.size(36.dp)) {
+                        Icon(
+                            painterResource(R.drawable.ic_share_24dp),
+                            stringResource(R.string.title_configuration_share),
+                            Modifier.size(24.dp)
+                        )
+                    }
+                    IconButton(onClick = onEdit, Modifier.size(36.dp)) {
+                        Icon(
+                            painterResource(R.drawable.ic_edit_24dp),
+                            stringResource(R.string.acc_edit),
+                            Modifier.size(24.dp)
+                        )
+                    }
+                    IconButton(onClick = onRemove, Modifier.size(36.dp)) {
+                        Icon(
+                            painterResource(R.drawable.ic_delete_24dp),
+                            stringResource(R.string.acc_delete),
+                            Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(6.dp))
